@@ -100,7 +100,7 @@ include "assets/includes/header.php";
                                         $sql_count = "SELECT COUNT(DISTINCT artisans.ArtisanID) as total
                                                       FROM artisans
                                                       INNER JOIN departments ON artisans.DepartmentID = departments.DepartmentID
-                                                      LEFT JOIN orders ON artisans.ArtisanID = orders.ArtisanID
+                                                      LEFT JOIN production_assignments pa ON artisans.ArtisanName = pa.ArtisanName
                                                       WHERE artisans.is_delete = 0 AND departments.is_delete = 0";
                                         $result_count = mysqli_query($conn, $sql_count);
                                         $total_records = mysqli_fetch_assoc($result_count)['total'];
@@ -109,21 +109,22 @@ include "assets/includes/header.php";
                                         $total_pages = ceil($total_records / $records_per_page);
 
                                         // Get records for the current page along with order count
-                                        $sql = "SELECT
-                                        artisans.ArtisanID,
-                                        artisans.ArtisanName,
-                                        artisans.Specialization,
-                                        artisans.JoinDate,
-                                        departments.DepartmentName,
-                                        COUNT(orders.OrderID) AS OrderCount
-                                        FROM artisans
-                                        INNER JOIN departments ON artisans.DepartmentID = departments.DepartmentID
-                                        LEFT JOIN orders ON artisans.ArtisanID = orders.ArtisanID
-                                        AND orders.Status IN ('inprocess', 'pending')  -- Only count incomplete orders
-                                        WHERE artisans.is_delete = 0 AND departments.is_delete = 0 $statusQuery
-                                        GROUP BY artisans.ArtisanID, artisans.ArtisanName, artisans.Specialization, artisans.JoinDate, departments.DepartmentName
-                                        ORDER BY artisans.ArtisanID DESC
-                                        LIMIT $offset, $records_per_page";
+                                        $sql = "SELECT 
+                                                artisans.ArtisanID,
+                                                artisans.ArtisanName,
+                                                artisans.Specialization,
+                                                artisans.JoinDate,
+                                                departments.DepartmentName,
+                                                COUNT(CASE WHEN pa.Status = 'In Progress' THEN 1 END) AS ActiveAssignments
+                                                FROM artisans
+                                                INNER JOIN departments ON artisans.DepartmentID = departments.DepartmentID
+                                                LEFT JOIN production_assignments pa ON artisans.ArtisanName = pa.ArtisanName
+                                                AND pa.is_delete = 0
+                                                WHERE artisans.is_delete = 0 AND departments.is_delete = 0 $statusQuery
+                                                GROUP BY artisans.ArtisanID, artisans.ArtisanName, artisans.Specialization, 
+                                                         artisans.JoinDate, departments.DepartmentName
+                                                ORDER BY artisans.ArtisanID DESC
+                                                LIMIT $offset, $records_per_page";
 
                                         $result = mysqli_query($conn, $sql) or die("Query Failed");
                                         // $result = mysqli_query($conn, $sql) or die("Query Failed");
@@ -145,7 +146,7 @@ include "assets/includes/header.php";
                                                     <td><?php echo date('Y-m-d A', strtotime($row['JoinDate'])); ?></td>
                                                     <td><?php echo $row['DepartmentName']; ?></td>
                                                     <td>
-                                                        <?php if ($row['OrderCount'] > 0): ?>
+                                                        <?php if ($row['ActiveAssignments'] > 0): ?>
                                                             <span class="badge bg-success-subtle text-success  p-2">Active</span>
                                                         <?php else: ?>
                                                             <span class="badge bg-danger-subtle text-danger  p-2">Inactive</span>

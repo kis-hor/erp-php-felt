@@ -1,71 +1,48 @@
 <?php
 session_start();
-if (!isset($_SESSION['Username'])) {
-    header('Location: login');
-    exit;
-}
-if ($_SESSION['Role'] == 'Accounts') {
+if (!isset($_SESSION['Username']) || $_SESSION['Role'] == 'Accounts') {
     header('Location: dashboard');
     exit;
 }
 include "config.php";
 $title = 'Orders';
-include "assets/includes/header.php";
 ?>
 
-
-<!-- Start right Content here -->
-<!-- ============================================================== -->
+<?php include "assets/includes/header.php"; ?>
 <div class="main-content">
-
     <div class="page-content">
         <div class="container-fluid">
-
-
-            <!-- start page title -->
             <div class="row">
                 <div class="col-12">
                     <div class="page-title-box d-sm-flex align-items-center justify-content-between">
                         <h4 class="mb-sm-0">Orders</h4>
-
                         <div class="page-title-right">
                             <ol class="breadcrumb m-0">
                                 <li class="breadcrumb-item"><a href="dashboard">Dashboard</a></li>
-                                <li class=" active"><i class="las la-angle-right"></i>Orders List</li>
+                                <li class="active"><i class="las la-angle-right"></i>Orders List</li>
                             </ol>
                         </div>
-
                     </div>
                 </div>
             </div>
-            <!-- end page title -->
-
+            <?php
+            if (isset($_SESSION['error']) && !empty($_SESSION['error'])) {
+                echo '<div class="alert alert-danger" role="alert">' . htmlspecialchars($_SESSION['error']) . '</div>';
+                unset($_SESSION['error']);
+            }
+            if (isset($_SESSION['success']) && !empty($_SESSION['success'])) {
+                echo '<div class="alert alert-primary" role="alert">' . htmlspecialchars($_SESSION['success']) . '</div>';
+                unset($_SESSION['success']);
+            }
+            ?>
             <div class="row pb-4 gy-3">
-                <?php
-
-                if (isset($_SESSION['error']) && !empty($_SESSION['error'])) {
-                    echo '<div class="alert alert-danger" role="alert" id="primary-alert">';
-                    echo '<strong>Error!</strong> ' . $_SESSION['error'];
-                    echo '</div>';
-                    unset($_SESSION['error']);
-                }
-
-                if (isset($_SESSION['success']) && !empty($_SESSION['success'])) {
-                    echo '<div class="alert alert-primary" role="alert" id="primary-alert">';
-                    echo '<strong>Success!</strong> ' . $_SESSION['success'];
-                    echo '</div>';
-                    unset($_SESSION['success']);
-                }
-                ?>
                 <div class="col-xl-12">
                     <div class="card">
                         <div class="card-body">
                             <form method="get">
                                 <div class="row">
                                     <div class="col-8">
-                                        <div class="form-group">
-                                            <input type="text" class="form-control" name="search_query" value="<?php echo isset($_GET['search_query']) ? htmlspecialchars($_GET['search_query']) : ''; ?>" placeholder="Search by Customer or Product">
-                                        </div>
+                                        <input type="text" class="form-control" name="search_query" value="<?php echo isset($_GET['search_query']) ? htmlspecialchars($_GET['search_query']) : ''; ?>" placeholder="Search by Customer or Product">
                                     </div>
                                     <div class="col-4">
                                         <button class="btn btn-success" type="submit">Search</button>
@@ -73,26 +50,17 @@ include "assets/includes/header.php";
                                     </div>
                                 </div>
                             </form>
-
                         </div>
                     </div>
                 </div>
-
-                <?php
-                if ($_SESSION['Role'] == 'Admin') {
-                ?>
+                <?php if ($_SESSION['Role'] == 'Admin') { ?>
                     <div class="col-sm-4">
                         <button class="btn btn-primary addPayment-modal" data-bs-toggle="modal" data-bs-target="#addpaymentModal"><i class="fa-solid fa-cart-plus"></i> Add New</button>
-                        <button class="btn btn-primary" id="bulkApproveBtn">
-                            Approve All
-                        </button>
-
+                        <button class="btn btn-primary" id="bulkApproveBtn">Approve All</button>
                     </div>
-
-
                 <?php } ?>
             </div>
-            <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'Quality Control' || $_SESSION['Role'] == 'Manager') { ?>
+            <?php if (in_array($_SESSION['Role'], ['Admin', 'Quality Control', 'Manager'])) { ?>
                 <div class="row">
                     <div class="col-xl-12">
                         <div class="card">
@@ -102,175 +70,130 @@ include "assets/includes/header.php";
                                         <thead>
                                             <tr class="text-muted text-uppercase">
                                                 <th><input type="checkbox" class="form-check checkall" id="checkall"></th>
-                                                <th scope="col">Orders ID</th>
-                                                <th scope="col">Artisan</th>
-                                                <th scope="col">Customer Name</th>
-                                                <th scope="col">Product</th>
-                                                <th scope="col">Quantity</th>
-                                                <th scope="col">Status</th>
-                                                <th scope="col">WagesPerUnit</th>
-                                                <th scope="col">Due Date</th>
-                                                <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'Quality Control') { ?>
-                                                    <th scope="col" style="width: 12%;">Action</th>
+                                                <th>Order ID</th>
+                                                <th>Artisan</th>
+                                                <th>Customer Name</th>
+                                                <th>Product</th>
+                                                <th>Quantity</th>
+                                                <th>Status</th>
+                                                <th>WagesPerUnit</th>
+                                                <th>Due Date</th>
+                                                <?php if (in_array($_SESSION['Role'], ['Admin', 'Quality Control'])) { ?>
+                                                    <th style="width: 12%;">Action</th>
                                                 <?php } ?>
                                             </tr>
                                         </thead>
-
                                         <tbody>
                                             <?php
-
-                                            // Set the number of records per page
                                             $records_per_page = 10;
-
-                                            // Get the current page number from URL, default is 1 if not present
-                                            $current_page = isset($_GET['page']) ? $_GET['page'] : 1;
-
-                                            // Calculate the offset
+                                            $current_page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
                                             $offset = ($current_page - 1) * $records_per_page;
-
-                                            // Initialize the SQL WHERE clause
-                                            $sql_where = "orders.is_delete = 0 AND artisans.is_delete = 0 AND departments.is_delete = 0";
-
-                                            // Check for the combined search query and add it to the SQL query
+                                            $sql_where = "orders.is_delete = 0";
                                             if (isset($_GET['search_query']) && !empty($_GET['search_query'])) {
                                                 $search_query = mysqli_real_escape_string($conn, $_GET['search_query']);
                                                 $sql_where .= " AND (orders.CustomerName LIKE '%$search_query%' OR orders.Product LIKE '%$search_query%')";
                                             }
-
-                                            // Get the total number of records
-                                            $sql_count = "SELECT COUNT(*) as total FROM orders 
-                                                                  INNER JOIN departments Using(DepartmentID) 
-                                                                  INNER JOIN artisans on artisans.ArtisanID = orders.ArtisanID 
-                                                                  WHERE $sql_where";
+                                            $sql_count = "SELECT COUNT(*) as total FROM orders WHERE $sql_where";
                                             $result_count = mysqli_query($conn, $sql_count);
                                             $total_records = mysqli_fetch_assoc($result_count)['total'];
-
-                                            // Calculate total pages
                                             $total_pages = ceil($total_records / $records_per_page);
-
-                                            // Get records for the current page
-                                            $sql = "SELECT *, orders.DepartmentID as Ord_DepartmentID FROM orders 
-                                                            INNER JOIN departments Using(DepartmentID) 
-                                                            INNER JOIN artisans on artisans.ArtisanID = orders.ArtisanID 
-                                                            WHERE $sql_where 
-                                                            ORDER BY OrderID DESC 
-                                                            LIMIT $offset, $records_per_page";
-
-                                            $result = mysqli_query($conn, $sql) or die("Query Failed");
-
-
-
-                                            // $result = mysqli_query($conn, $sql) or die("Query Failed");
+                                            $sql = "SELECT orders.*, artisans.ArtisanName, ic.PendingQuantity
+                                                    FROM orders 
+                                                    LEFT JOIN artisans ON artisans.ArtisanID = orders.ArtisanID 
+                                                    LEFT JOIN inventory_checks ic ON orders.InventoryCheckID = ic.InventoryCheckID
+                                                    WHERE $sql_where 
+                                                    ORDER BY orders.OrderID DESC 
+                                                    LIMIT $offset, $records_per_page";
+                                            $result = mysqli_query($conn, $sql) or die("Query Failed: " . mysqli_error($conn));
                                             if (mysqli_num_rows($result) > 0) {
                                                 while ($row = mysqli_fetch_assoc($result)) {
+                                                    $pending_quantity = $row['PendingQuantity'] ?? $row['Quantity'];
                                             ?>
-
-                                                    <tr data-order_id="<?php echo $row['OrderID']; ?>" data-customer_name="<?php echo $row['CustomerName']; ?>" data-product="<?php echo $row['Product']; ?>" data-quantity="<?php echo $row['Quantity']; ?>" data-wages_per_piece="<?php echo $row['WagesPerPiece']; ?>" data-production_due_date="<?php echo $row['ProductionDueDate']; ?>" data-department_id="<?php echo $row['Ord_DepartmentID']; ?>" data-artisan_id="<?php echo $row['ArtisanID']; ?>" data-artisan_name=" <?php echo $row['ArtisanName']; ?>">
+                                                    <tr data-order_id="<?php echo $row['OrderID']; ?>"
+                                                        data-customer_name="<?php echo htmlspecialchars($row['CustomerName']); ?>"
+                                                        data-product="<?php echo htmlspecialchars($row['Product']); ?>"
+                                                        data-quantity="<?php echo $row['Quantity']; ?>"
+                                                        data-wages_per_piece="<?php echo $row['WagesPerPiece']; ?>"
+                                                        data-production_due_date="<?php echo $row['ProductionDueDate']; ?>"
+                                                        data-department_id="<?php echo $row['DepartmentID']; ?>"
+                                                        data-artisan_id="<?php echo $row['ArtisanID']; ?>"
+                                                        data-artisan_name="<?php echo htmlspecialchars($row['ArtisanName']); ?>"
+                                                        data-pending_quantity="<?php echo $pending_quantity; ?>">
                                                         <td>
-                                                            <?php if ($row['Status'] == 'inprocess' || $row['Status'] == 'overdue') { ?>
+                                                            <?php if (in_array($row['Status'], ['inprocess', 'overdue'])) { ?>
                                                                 <input type="checkbox" class="form-check" name="selectedOrders[]" value="<?php echo $row['OrderID']; ?>">
                                                             <?php } ?>
                                                         </td>
                                                         <td><?php echo $row['OrderID']; ?></td>
-                                                        <td><?php echo $row['ArtisanName']; ?></td>
-                                                        <td><?php echo $row['CustomerName']; ?></td>
-                                                        <td><?php echo $row['Product']; ?></td>
+                                                        <td><?php echo htmlspecialchars($row['ArtisanName'] ?? 'Not Assigned'); ?></td>
+                                                        <td><?php echo htmlspecialchars($row['CustomerName']); ?></td>
+                                                        <td><?php echo htmlspecialchars($row['Product']); ?></td>
                                                         <td><?php echo $row['Quantity']; ?></td>
                                                         <?php
-                                                        // Check if the order is overdue
                                                         $current_date = date('Y-m-d');
-                                                        $is_overdue = strtotime($row['ProductionDueDate']) < strtotime($current_date);
-
-                                                        // Determine the status class and label
+                                                        $is_overdue = $row['ProductionDueDate'] && strtotime($row['ProductionDueDate']) < strtotime($current_date);
                                                         if ($is_overdue && $row['Status'] == 'inprocess') {
                                                             $status_class = 'bg-danger-subtle text-danger';
                                                             $status_label = 'Overdue';
-                                                        } else if ($row['Status'] == 'inprocess') {
+                                                        } elseif ($row['Status'] == 'inprocess') {
                                                             $status_class = 'bg-danger-subtle text-danger';
-                                                            $status_label = $row['Status'];
-                                                        } else if ($row['Status'] == 'Dispatch') {
+                                                            $status_label = 'In Process';
+                                                        } elseif ($row['Status'] == 'Dispatch') {
                                                             $status_class = 'bg-success-subtle text-success';
-                                                            $status_label = $row['Status'];
+                                                            $status_label = 'Dispatch';
                                                         } else {
                                                             $status_class = 'bg-warning-subtle text-warning';
                                                             $status_label = $row['Status'];
                                                         }
                                                         ?>
-
-                                                        <td>
-                                                            <span class="badge text-capitalized <?php echo $status_class; ?> p-2">
-                                                                <?php echo $status_label; ?>
-                                                            </span>
-                                                        </td>
-                                                        <td><?php echo $row['WagesPerPiece']; ?></td>
-                                                        <td><?php echo $row['ProductionDueDate']; ?></td>
-
-
-                                                        <td>
-                                                            <ul class="list-inline hstack  mb-0">
-                                                                <?php
-                                                                if ($_SESSION['Role'] == 'Quality Control' || $_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'Manager') {
-                                                                ?>
-                                                                    <?php
-
-                                                                    if ($row['Status'] == 'inprocess') {
-                                                                        if ($_SESSION['Role'] == 'Quality Control' || $_SESSION['Role'] == 'Admin') {
-                                                                    ?>
-
-                                                                            <li class="list-inline-item approve" data-bs-toggle="tooltip" data-bs-trigger="hover" data-bs-placement="top" title="Edit">
-                                                                                <button href="" class="btn btn-soft-info btn-sm d-inline-block " data-bs-toggle="modal3" data-bs-target="#approvepaymentModal">
-                                                                                    Approve
-                                                                                </button>
+                                                        <td><span class="badge text-capitalize <?php echo $status_class; ?> p-2"><?php echo $status_label; ?></span></td>
+                                                        <td><?php echo $row['WagesPerPiece'] ?: 'N/A'; ?></td>
+                                                        <td><?php echo $row['ProductionDueDate'] ?: 'N/A'; ?></td>
+                                                        <?php if (in_array($_SESSION['Role'], ['Admin', 'Quality Control'])) { ?>
+                                                            <td>
+                                                                <ul class="list-inline hstack mb-0">
+                                                                    <?php if ($row['Status'] == 'inprocess') { ?>
+                                                                        <?php if (in_array($_SESSION['Role'], ['Admin', 'Quality Control'])) { ?>
+                                                                            <li class="list-inline-item approve" data-bs-toggle="tooltip" title="Approve">
+                                                                                <button class="btn btn-soft-info btn-sm d-inline-block" data-bs-toggle="modal" data-bs-target="#approvepaymentModal">Approve</button>
                                                                             </li>
-                                                                        <?php
-                                                                        }
-                                                                        if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'Manager') {
-                                                                        ?>
-                                                                            <li class="list-inline-item edit" data-bs-toggle="tooltip" data-bs-trigger="hover" data-bs-placement="top" title="Edit">
-                                                                                <button href="" class="btn btn-soft-info btn-sm d-inline-block " data-bs-toggle="modal2" data-bs-target="#editpaymentModal">
+                                                                        <?php } ?>
+                                                                        <?php if (in_array($_SESSION['Role'], ['Admin', 'Manager'])) { ?>
+                                                                            <li class="list-inline-item edit" data-bs-toggle="tooltip" title="Edit">
+                                                                                <button class="btn btn-soft-info btn-sm d-inline-block" data-bs-toggle="modal" data-bs-target="#editpaymentModal">
                                                                                     <i class="las la-pen fs-17 align-middle"></i>
                                                                                 </button>
                                                                             </li>
                                                                             <?php if ($_SESSION['Role'] == 'Admin') { ?>
-                                                                                <li class="list-inline-item" data-bs-toggle="tooltip" data-bs-trigger="hover" data-bs-placement="top" title="Remove">
+                                                                                <li class="list-inline-item" data-bs-toggle="tooltip" title="Remove">
                                                                                     <a href="order-process?id=<?php echo $row['OrderID']; ?>" class="btn btn-soft-danger btn-sm d-inline-block" onclick="return confirm('Do you want to delete this Order?')">
                                                                                         <i class="las la-file-download fs-17 align-middle"></i>
                                                                                     </a>
                                                                                 </li>
                                                                             <?php } ?>
                                                                         <?php } ?>
-                                                                    <?php } else if ($row['Status'] == 'Dispatch') {
-                                                                        echo '<li class="list-inline-item"> <button class="btn btn-soft-success btn-sm d-inline-block ">Completed</button></li>';
-                                                                    } else {
-                                                                        echo '<li class="list-inline-item"> <button class="btn btn-soft-warning btn btn-sm d-inline-block">Approved</button></li>';
-                                                                    }
-                                                                    ?>
-                                                            </ul>
-                                                        </td>
-                                                    <?php } ?>
-
+                                                                    <?php } elseif ($row['Status'] == 'Dispatch') { ?>
+                                                                        <li class="list-inline-item"><button class="btn btn-soft-success btn-sm d-inline-block">Completed</button></li>
+                                                                    <?php } else { ?>
+                                                                        <li class="list-inline-item"><button class="btn btn-soft-warning btn-sm d-inline-block">Approved</button></li>
+                                                                    <?php } ?>
+                                                                </ul>
+                                                            </td>
+                                                        <?php } ?>
                                                     </tr>
                                             <?php
                                                 }
                                             } else {
-                                                echo '
-                                            <tr>
-                                                <td colspan="7"><h2>No Records Found</h2></td>
-                                            </tr>';
+                                                echo '<tr><td colspan="10"><h2>No Records Found</h2></td></tr>';
                                             }
                                             ?>
-
-
                                         </tbody>
-
-                                        <!-- end tbody -->
-                                    </table><!-- end table -->
-                                </div><!-- end table responsive -->
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-
                 <div class="row align-items-center mb-4 gy-3">
                     <div class="col-md-5">
                         <p class="mb-0 text-muted">Showing <b><?php echo ($offset + 1); ?></b> to <b><?php echo min($offset + $records_per_page, $total_records); ?></b> of <b><?php echo $total_records; ?></b> results</p>
@@ -304,122 +227,71 @@ include "assets/includes/header.php";
                                     <table class="table table-hover table-nowrap align-middle mb-0">
                                         <thead>
                                             <tr class="text-muted text-uppercase">
-                                                <th scope="col">Orders ID</th>
-                                                <th scope="col">Customer Name</th>
-                                                <th scope="col">Product</th>
-                                                <th scope="col">Quantity</th>
-                                                <th scope="col">Status</th>
-                                                <th scope="col">Wages Per Piece</th>
-                                                <th scope="col">Production Due Date</th>
-                                                <th scope="col">Artisan Name</th>
-                                                <th scope="col">Department Name</th>
-
+                                                <th>Order ID</th>
+                                                <th>Customer Name</th>
+                                                <th>Product</th>
+                                                <th>Quantity</th>
+                                                <th>Status</th>
+                                                <th>Wages Per Piece</th>
+                                                <th>Production Due Date</th>
+                                                <th>Artisan Name</th>
+                                                <th>Department Name</th>
                                             </tr>
                                         </thead>
-
                                         <tbody>
                                             <?php
-
-                                            // Set the number of records per page
-                                            $records_per_page = 10;
-
-                                            // Get the current page number from URL, default is 1 if not present
-                                            $current_page = isset($_GET['page']) ? $_GET['page'] : 1;
-
-                                            // Calculate the offset
-                                            $offset = ($current_page - 1) * $records_per_page;
-
-                                            // Initialize the SQL WHERE clause
-                                            $sql_where = "orders.is_delete = 0 AND artisans.is_delete = 0 AND departments.is_delete = 0";
-
-                                            // Check for additional filters and add them to the SQL query
-                                            if (isset($_GET['customer_name']) && !empty($_GET['customer_name'])) {
-                                                $customer_name = mysqli_real_escape_string($conn, $_GET['customer_name']);
-                                                $sql_where .= " AND orders.CustomerName LIKE '%$customer_name%'";
-                                            }
-
-                                            if (isset($_GET['product_name']) && !empty($_GET['product_name'])) {
-                                                $product_name = mysqli_real_escape_string($conn, $_GET['product_name']);
-                                                $sql_where .= " AND orders.Product LIKE '%$product_name%'";
-                                            }
-
-                                            // Get the total number of records
-                                            $sql_count = "SELECT COUNT(*) as total FROM orders INNER JOIN departments Using(DepartmentID) INNER JOIN artisans on artisans.ArtisanID = orders.ArtisanID WHERE $sql_where";
-                                            $result_count = mysqli_query($conn, $sql_count);
-                                            $total_records = mysqli_fetch_assoc($result_count)['total'];
-
-                                            // Calculate total pages
-                                            $total_pages = ceil($total_records / $records_per_page);
-
-                                            // Get records for the current page
-                                            $sql = "SELECT *, orders.DepartmentID as Ord_DepartmentID FROM orders INNER JOIN departments Using(DepartmentID) INNER JOIN artisans on artisans.ArtisanID = orders.ArtisanID WHERE $sql_where ORDER BY OrderID DESC LIMIT $offset, $records_per_page";
-                                            $result = mysqli_query($conn, $sql) or die("Query Failed");
-
-                                            // $result = mysqli_query($conn, $sql) or die("Query Failed");
+                                            $sql = "SELECT orders.*, artisans.ArtisanName, departments.DepartmentName
+                                                    FROM orders 
+                                                    LEFT JOIN artisans ON artisans.ArtisanID = orders.ArtisanID 
+                                                    LEFT JOIN departments ON departments.DepartmentID = orders.DepartmentID
+                                                    WHERE orders.is_delete = 0 
+                                                    ORDER BY orders.OrderID DESC 
+                                                    LIMIT $offset, $records_per_page";
+                                            $result = mysqli_query($conn, $sql) or die("Query Failed: " . mysqli_error($conn));
                                             if (mysqli_num_rows($result) > 0) {
                                                 while ($row = mysqli_fetch_assoc($result)) {
                                             ?>
-
-                                                    <tr data-order_id="<?php echo $row['OrderID']; ?>" data-customer_name="<?php echo $row['CustomerName']; ?>" data-product="<?php echo $row['Product']; ?>" data-quantity="<?php echo $row['Quantity']; ?>" data-wages_per_piece="<?php echo $row['WagesPerPiece']; ?>" data-production_due_date="<?php echo $row['ProductionDueDate']; ?>" data-department_id="<?php echo $row['Ord_DepartmentID']; ?>" data-artisan_id="<?php echo $row['ArtisanID']; ?>">
-
+                                                    <tr>
                                                         <td><?php echo $row['OrderID']; ?></td>
-                                                        <td><?php echo $row['CustomerName']; ?></td>
-                                                        <td><?php echo $row['Product']; ?></td>
+                                                        <td><?php echo htmlspecialchars($row['CustomerName']); ?></td>
+                                                        <td><?php echo htmlspecialchars($row['Product']); ?></td>
                                                         <td><?php echo $row['Quantity']; ?></td>
                                                         <?php
-                                                        // Check if the order is overdue
                                                         $current_date = date('Y-m-d');
-                                                        $is_overdue = strtotime($row['ProductionDueDate']) < strtotime($current_date);
-
-                                                        // Determine the status class and label
+                                                        $is_overdue = $row['ProductionDueDate'] && strtotime($row['ProductionDueDate']) < strtotime($current_date);
                                                         if ($is_overdue && $row['Status'] == 'inprocess') {
                                                             $status_class = 'bg-danger-subtle text-danger';
                                                             $status_label = 'Overdue';
-                                                        } else if ($row['Status'] == 'inprocess') {
+                                                        } elseif ($row['Status'] == 'inprocess') {
                                                             $status_class = 'bg-danger-subtle text-danger';
-                                                            $status_label = $row['Status'];
-                                                        } else if ($row['Status'] == 'Dispatch') {
+                                                            $status_label = 'In Process';
+                                                        } elseif ($row['Status'] == 'Dispatch') {
                                                             $status_class = 'bg-success-subtle text-success';
-                                                            $status_label = $row['Status'];
+                                                            $status_label = 'Dispatch';
                                                         } else {
                                                             $status_class = 'bg-warning-subtle text-warning';
                                                             $status_label = $row['Status'];
                                                         }
                                                         ?>
-
-                                                        <td>
-                                                            <span class="badge text-capitalized <?php echo $status_class; ?> p-2">
-                                                                <?php echo $status_label; ?>
-                                                            </span>
-                                                        </td>
-                                                        <td><?php echo $row['WagesPerPiece']; ?></td>
-                                                        <td><?php echo $row['ProductionDueDate']; ?></td>
-                                                        <td><?php echo $row['ArtisanName']; ?></td>
-                                                        <td><?php echo $row['DepartmentName']; ?></td>
-
-
+                                                        <td><span class="badge text-capitalize <?php echo $status_class; ?> p-2"><?php echo $status_label; ?></span></td>
+                                                        <td><?php echo $row['WagesPerPiece'] ?: 'N/A'; ?></td>
+                                                        <td><?php echo $row['ProductionDueDate'] ?: 'N/A'; ?></td>
+                                                        <td><?php echo htmlspecialchars($row['ArtisanName'] ?? 'Not Assigned'); ?></td>
+                                                        <td><?php echo htmlspecialchars($row['DepartmentName'] ?? 'Not Assigned'); ?></td>
                                                     </tr>
                                             <?php
                                                 }
                                             } else {
-                                                echo '
-                                            <tr>
-                                                <td colspan="7"><h2>No Records Found</h2></td>
-                                            </tr>';
+                                                echo '<tr><td colspan="9"><h2>No Records Found</h2></td></tr>';
                                             }
                                             ?>
-
-
                                         </tbody>
-
-                                        <!-- end tbody -->
-                                    </table><!-- end table -->
-                                </div><!-- end table responsive -->
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-
                 <div class="row align-items-center mb-4 gy-3">
                     <div class="col-md-5">
                         <p class="mb-0 text-muted">Showing <b><?php echo ($offset + 1); ?></b> to <b><?php echo min($offset + $records_per_page, $total_records); ?></b> of <b><?php echo $total_records; ?></b> results</p>
@@ -445,439 +317,348 @@ include "assets/includes/header.php";
             <?php } ?>
         </div>
     </div>
-    <!-- container-fluid -->
-</div>
-<!-- Add user Modal -->
-<!-- Modal -->
-<div class="modal fade" id="addpaymentModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0">
-            <div class="modal-header p-4 pb-0">
-                <h5 class="modal-title" id="createMemberLabel">Add Order</h5>
-                <button type="button" class="btn-close" id="createMemberBtn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <form id="memberlist-form" class="needs-validation" novalidate enctype="multipart/form-data" method="post" action="order-process">
-                    <div class="row">
-                        <div class="col-lg-12">
-                            <div class="mb-3 mt-4">
-                                <label for="CustomerName" class="form-label">Customer Name</label>
-                                <input type="text" class="form-control" name="CustomerName" id="CustomerName" placeholder="Enter Customer Name" required>
-                            </div>
-                            <div class="mb-3 mt-4">
-                                <label for="Product" class="form-label">Product</label>
-                                <input type="text" class="form-control" name="Product" id="Product" placeholder="Enter Product" required>
-                            </div>
-                            <div class="mb-3 mt-4">
-                                <label for="Quantity" class="form-label">Quantity</label>
-                                <input type="number" class="form-control" name="Quantity" id="Quantity" placeholder="Enter Quantity" required>
-                            </div>
-                            <div class="mb-3 mt-4">
-                                <label for="WagesPerPiece" class="form-label">Wages Per Piece</label>
-                                <input type="number" class="form-control" name="WagesPerPiece" id="WagesPerPiece" placeholder="Enter Wages Per Piece" required>
-                            </div>
-                            <div class="mb-3 mt-4">
-                                <label for="ProductionDueDate" class="form-label">Production Due Date</label>
-                                <input type="date" class="form-control" name="ProductionDueDate" id="ProductionDueDate" required>
-                            </div>
-                            <div class="mb-4">
-                                <label for="ArtisanID" class="form-label">Artisan Name</label>
-                                <select class="form-select" name="ArtisanID" id="ArtisanID" required>
-                                    <option disabled selected>Select Artisan Name</option>
-                                    <?php
-                                    $sql_artisan = "SELECT * FROM artisans WHERE is_delete = 0";
-                                    $result_artisan = mysqli_query($conn, $sql_artisan);
-                                    if (mysqli_num_rows($result_artisan) > 0) {
-                                        while ($row_artisan = mysqli_fetch_assoc($result_artisan)) {
-                                            echo '<option value="' . $row_artisan['ArtisanID'] . '">' . $row_artisan['ArtisanName'] . '</option>';
-                                        }
-                                    } else {
-                                        echo '<option value="">No records found</option>';
+    <!-- Add Order Modal -->
+    <div class="modal fade" id="addpaymentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0">
+                <div class="modal-header p-4 pb-0">
+                    <h5 class="modal-title">Add Order</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="add-order-form" class="needs-validation" novalidate method="post" action="order-process">
+                        <div class="mb-3">
+                            <label for="OrderID" class="form-label">Order</label>
+                            <select class="form-select" id="OrderID" name="OrderID" required>
+                                <option disabled selected>Select Order</option>
+                                <?php
+                                $sql_orders = "SELECT o.OrderID, o.CustomerName, o.Product, o.Quantity, ic.PendingQuantity 
+                                               FROM orders o 
+                                               JOIN inventory_checks ic ON o.InventoryCheckID = ic.InventoryCheckID 
+                                               WHERE o.is_delete = 0 AND o.Status = 'SentToProduction'";
+                                $result_orders = mysqli_query($conn, $sql_orders);
+                                if (mysqli_num_rows($result_orders) > 0) {
+                                    while ($row_order = mysqli_fetch_assoc($result_orders)) {
+                                        echo '<option value="' . $row_order['OrderID'] . '" 
+                                                    data-customer_name="' . htmlspecialchars($row_order['CustomerName']) . '" 
+                                                    data-product="' . htmlspecialchars($row_order['Product']) . '" 
+                                                    data-quantity="' . $row_order['PendingQuantity'] . '">
+                                                    ' . htmlspecialchars($row_order['CustomerName']) . ' - ' . htmlspecialchars($row_order['Product']) . ' (Qty: ' . $row_order['PendingQuantity'] . ')
+                                              </option>';
                                     }
-                                    ?>
-                                </select>
-                            </div>
-                            <div class="mb-4">
-                                <label for="DepartmentID" class="form-label">Department Name</label>
-                                <select class="form-select" name="DepartmentID" id="DepartmentID" required>
-                                    <option disabled selected>Select Department Name</option>
-
-
-                                </select>
-                            </div>
-                            <div class="hstack gap-2 justify-content-end">
-                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                                <button type="submit" class="btn btn-success" name="Add_Order" id="addNewMember">Add Order</button>
-                            </div>
+                                } else {
+                                    echo '<option value="">No pending orders found</option>';
+                                }
+                                ?>
+                            </select>
                         </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-        <!--end modal-content-->
-    </div>
-    <!--end modal-dialog-->
-</div>
-<!--end modal-->
-<!-- edit user Modal -->
-<!-- Modal -->
-<div class="modal fade" id="editpaymentModal" tabindex="-2" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0">
-            <div class="modal-header p-4 pb-0">
-                <h5 class="modal-title" id="createMemberLabel">Edit Order</h5>
-                <button type="button" class="btn-close" id="createMemberBtn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <form id="memberlist-form" class="needs-validation" novalidate enctype="multipart/form-data" method="post" action="order-process">
-                    <div class="row">
-                        <div class="col-lg-12">
-                            <div class="mb-3 mt-4">
-                                <input type="hidden" name="OrderID" id="edit_order_id">
-                                <label for="CustomerName" class="form-label">Customer Name</label>
-                                <input type="text" class="form-control" name="CustomerName" id="eidt_customer_name" placeholder="Enter Customer Name" required>
-                            </div>
-                            <div class="mb-3 mt-4">
-                                <label for="Product" class="form-label">Product</label>
-                                <input type="text" class="form-control" name="Product" id="eidt_product" placeholder="Enter Product" required>
-                            </div>
-                            <div class="mb-3 mt-4">
-                                <label for="Quantity" class="form-label">Quantity</label>
-                                <input type="number" class="form-control" name="Quantity" id="eidt_quantity" placeholder="Enter Quantity" required>
-                            </div>
-                            <div class="mb-3 mt-4">
-                                <label for="WagesPerPiece" class="form-label">Wages Per Piece</label>
-                                <input type="number" class="form-control" name="WagesPerPiece" id="eidt_wages_per_piece" placeholder="Enter Wages Per Piece" required>
-                            </div>
-                            <div class="mb-3 mt-4">
-                                <label for="eidt_production_due_date" class="form-label">Production Due Date</label>
-                                <input type="date" class="form-control" name="ProductionDueDate" id="eidt_production_due_date" required>
-                            </div>
-                            <div class="mb-4">
-                                <label for="ArtisanID" class="form-label">Artisan Name</label>
-                                <select class="form-select" name="ArtisanID" id="eidt_artisan_id" required>
-                                    <option disabled selected>Select Artisan Name</option>
-                                    <?php
-                                    $sql_artisan = "SELECT * FROM artisans WHERE is_delete = 0";
-                                    $result_artisan = mysqli_query($conn, $sql_artisan);
-                                    if (mysqli_num_rows($result_artisan) > 0) {
-                                        while ($row_artisan = mysqli_fetch_assoc($result_artisan)) {
-                                            echo '<option value="' . $row_artisan['ArtisanID'] . '">' . $row_artisan['ArtisanName'] . '</option>';
-                                        }
-                                    } else {
-                                        echo '<option value="">No records found</option>';
+                        <div class="mb-3">
+                            <label for="CustomerName" class="form-label">Customer Name</label>
+                            <input type="text" class="form-control" name="CustomerName" id="CustomerName" readonly required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="Product" class="form-label">Product</label>
+                            <input type="text" class="form-control" name="Product" id="Product" readonly required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="Quantity" class="form-label">Quantity</label>
+                            <input type="number" class="form-control" name="Quantity" id="Quantity" min="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="WagesPerPiece" class="form-label">Wages Per Piece</label>
+                            <input type="number" class="form-control" name="WagesPerPiece" id="WagesPerPiece" step="0.01" min="0" placeholder="Enter Wages Per Piece" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="ProductionDueDate" class="form-label">Production Due Date</label>
+                            <input type="date" class="form-control" name="ProductionDueDate" id="ProductionDueDate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="ArtisanID" class="form-label">Artisan Name</label>
+                            <select class="form-select" name="ArtisanID" id="ArtisanID" required>
+                                <option disabled selected>Select Artisan Name</option>
+                                <?php
+                                $sql_artisan = "SELECT * FROM artisans WHERE is_delete = 0";
+                                $result_artisan = mysqli_query($conn, $sql_artisan);
+                                if (mysqli_num_rows($result_artisan) > 0) {
+                                    while ($row_artisan = mysqli_fetch_assoc($result_artisan)) {
+                                        echo '<option value="' . $row_artisan['ArtisanID'] . '">' . htmlspecialchars($row_artisan['ArtisanName']) . '</option>';
                                     }
-                                    ?>
-                                </select>
-                            </div>
-                            <div class="mb-4">
-                                <label for="DepartmentID" class="form-label">Department Name</label>
-                                <select class="form-select" name="DepartmentID" id="eidt_department_id" required>
-                                    <option disabled selected>Select Department NAme</option>
-                                    <?php
-                                    $sql_artisan = "SELECT * FROM departments WHERE is_delete = 0";
-                                    $result_artisan = mysqli_query($conn, $sql_artisan);
-                                    if (mysqli_num_rows($result_artisan) > 0) {
-                                        while ($row_artisan = mysqli_fetch_assoc($result_artisan)) {
-                                            echo '<option value="' . $row_artisan['DepartmentID'] . '">' . $row_artisan['DepartmentName'] . '</option>';
-                                        }
-                                    } else {
-                                        echo '<option value="">No records found</option>';
+                                } else {
+                                    echo '<option value="">No artisans found</option>';
+                                }
+                                ?>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="DepartmentID" class="form-label">Department Name</label>
+                            <select class="form-select" name="DepartmentID" id="DepartmentID" required>
+                                <option disabled selected>Select Department Name</option>
+                                <?php
+                                $sql_dept = "SELECT * FROM departments WHERE is_delete = 0";
+                                $result_dept = mysqli_query($conn, $sql_dept);
+                                if (mysqli_num_rows($result_dept) > 0) {
+                                    while ($row_dept = mysqli_fetch_assoc($result_dept)) {
+                                        echo '<option value="' . $row_dept['DepartmentID'] . '">' . htmlspecialchars($row_dept['DepartmentName']) . '</option>';
                                     }
-                                    ?>
-                                </select>
-                            </div>
-                            <div class="hstack gap-2 justify-content-end">
-                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                                <button type="submit" class="btn btn-success" name="Edit_Order" id="addNewMember">Update Order</button>
-                            </div>
+                                } else {
+                                    echo '<option value="">No departments found</option>';
+                                }
+                                ?>
+                            </select>
                         </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="modal fade" id="approvepaymentModal" tabindex="-3" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0">
-            <div class="modal-header p-4 pb-0">
-                <h5 class="modal-title" id="createMemberLabel">Approve Order</h5>
-                <button type="button" class="btn-close" id="createMemberBtn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <form id="memberlist-form" class="needs-validation" novalidate enctype="multipart/form-data" method="post" action="quality-control-process">
-                    <div class="row">
-                        <div class="col-lg-12">
-                            <div class="mb-3 mt-4">
-                                <label for="ApprovedQuantity" class="form-label">Approved Quantity</label>
-                                <input type="number" class="form-control" name="ApprovedQuantity" id="approve_quantity" placeholder="Enter Approved Quantity" required>
-                            </div>
-                            <!-- <div class="mb-3 mt-4">
-
-                                    <label for="RejectedQuantity" class="form-label">Rejected Quantity</label>
-                                    <input type="number" class="form-control" name="RejectedQuantity" id="approve_reject_quantity" placeholder="Enter Rejected Quantity" required>
-                                </div> -->
-                            <div class="mb-3 mt-4">
-                                <label for="ApprovalDate" class="form-label">Approval Date</label>
-                                <input type="date" class="form-control" name="ApprovalDate" id="ApprovalDate" placeholder="Enter Approval Date" required>
-                            </div>
-                            <div class="mb-4">
-                                <label for="OrderID" class="form-label">Orders</label>
-
-                                <input type="text" class="form-control" id="approve_order_id" readonly>
-                                <input type="hidden" name="OrderID" id="approve_order_id_new">
-
-                            </div>
-
-                            <div class="hstack gap-2 justify-content-end">
-                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                                <button type="submit" class="btn btn-success" name="Approve_Order" id="addNewMember">Approve Order</button>
-                            </div>
+                        <div class="hstack gap-2 justify-content-end">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-success" name="Assign_Order">Assign Order</button>
                         </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-        <!--end modal-content-->
-    </div>
-    <!--end modal-dialog-->
-</div>
-<!--end modal-->
-<div class="modal fade" id="bulkapprovepaymentModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0">
-            <div class="modal-header p-4 pb-0">
-                <h5 class="modal-title">Bulk Approve Orders</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <form id="bulk-approve-form" class="needs-validation" novalidate enctype="multipart/form-data" method="post" action="quality-control-process">
-                    <table class="table table-striped table-hover" id="bulkApproveTable">
-                        <thead>
-                            <tr>
-                                <th class="col" style="width: 75%;">Product</th>
-                                <th class="col">Artisan</th>
-                                <th class="col">Quantity to Approve</th>
-                                <th class="col">Approval Date</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Dynamic rows will be appended here -->
-
-                        </tbody>
-                    </table>
-                    <div class="hstack gap-2 justify-content-end">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-success" name="approve_all">Approve All</button>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
+    <!-- Edit Order Modal -->
+    <div class="modal fade" id="editpaymentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0">
+                <div class="modal-header p-4 pb-0">
+                    <h5 class="modal-title">Edit Order</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="edit-order-form" class="needs-validation" novalidate method="post" action="order-process">
+                        <input type="hidden" name="OrderID" id="edit_order_id">
+                        <div class="mb-3">
+                            <label for="CustomerName" class="form-label">Customer Name</label>
+                            <input type="text" class="form-control" name="CustomerName" id="edit_customer_name" readonly required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="Product" class="form-label">Product</label>
+                            <input type="text" class="form-control" name="Product" id="edit_product" readonly required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="Quantity" class="form-label">Quantity</label>
+                            <input type="number" class="form-control" name="Quantity" id="edit_quantity" min="1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="WagesPerPiece" class="form-label">Wages Per Piece</label>
+                            <input type="number" class="form-control" name="WagesPerPiece" id="edit_wages_per_piece" step="0.01" min="0" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="ProductionDueDate" class="form-label">Production Due Date</label>
+                            <input type="date" class="form-control" name="ProductionDueDate" id="edit_production_due_date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="ArtisanID" class="form-label">Artisan Name</label>
+                            <select class="form-select" name="ArtisanID" id="edit_artisan_id" required>
+                                <option disabled selected>Select Artisan Name</option>
+                                <?php
+                                $sql_artisan = "SELECT * FROM artisans WHERE is_delete = 0";
+                                $result_artisan = mysqli_query($conn, $sql_artisan);
+                                if (mysqli_num_rows($result_artisan) > 0) {
+                                    while ($row_artisan = mysqli_fetch_assoc($result_artisan)) {
+                                        echo '<option value="' . $row_artisan['ArtisanID'] . '">' . htmlspecialchars($row_artisan['ArtisanName']) . '</option>';
+                                    }
+                                } else {
+                                    echo '<option value="">No artisans found</option>';
+                                }
+                                ?>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="DepartmentID" class="form-label">Department Name</label>
+                            <select class="form-select" name="DepartmentID" id="edit_department_id" required>
+                                <option disabled selected>Select Department Name</option>
+                                <?php
+                                $sql_dept = "SELECT * FROM departments WHERE is_delete = 0";
+                                $result_dept = mysqli_query($conn, $sql_dept);
+                                if (mysqli_num_rows($result_dept) > 0) {
+                                    while ($row_dept = mysqli_fetch_assoc($result_dept)) {
+                                        echo '<option value="' . $row_dept['DepartmentID'] . '">' . htmlspecialchars($row_dept['DepartmentName']) . '</option>';
+                                    }
+                                } else {
+                                    echo '<option value="">No departments found</option>';
+                                }
+                                ?>
+                            </select>
+                        </div>
+                        <div class="hstack gap-2 justify-content-end">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-success" name="Edit_Order">Update Order</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Approve Order Modal -->
+    <div class="modal fade" id="approvepaymentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0">
+                <div class="modal-header p-4 pb-0">
+                    <h5 class="modal-title">Approve Order</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="approve-order-form" class="needs-validation" novalidate method="post" action="quality-control-process">
+                        <div class="mb-3">
+                            <label for="ApprovedQuantity" class="form-label">Approved Quantity</label>
+                            <input type="number" class="form-control" name="ApprovedQuantity" id="approve_quantity" min="0" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="ApprovalDate" class="form-label">Approval Date</label>
+                            <input type="date" class="form-control" name="ApprovalDate" id="ApprovalDate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="OrderID" class="form-label">Order</label>
+                            <input type="text" class="form-control" id="approve_order_id" readonly>
+                            <input type="hidden" name="OrderID" id="approve_order_id_new">
+                        </div>
+                        <div class="hstack gap-2 justify-content-end">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-success" name="Approve_Order">Approve Order</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Bulk Approve Orders Modal -->
+    <div class="modal fade" id="bulkapprovepaymentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0">
+                <div class="modal-header p-4 pb-0">
+                    <h5 class="modal-title">Bulk Approve Orders</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="bulk-approve-form" class="needs-validation" novalidate method="post" action="quality-control-process">
+                        <table class="table table-striped table-hover" id="bulkApproveTable">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Artisan</th>
+                                    <th>Quantity to Approve</th>
+                                    <th>Approval Date</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                        <div class="hstack gap-2 justify-content-end">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-success" name="approve_all">Approve All</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-
-<!--end modal-->
-</div>
-<!-- <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script> -->
-
 
 <script>
     $(document).ready(function() {
-
-
-        $('#ArtisanID').on('change', function() {
-            var artisanID = $(this).val();
-
-            if (artisanID) {
-                $.ajax({
-                    url: 'fetch_department.php',
-                    type: 'POST',
-                    data: {
-                        ArtisanID: artisanID
-                    },
-                    success: function(response) {
-                        $('#DepartmentID').html(response);
-                    }
-                });
-            } else {
-                $('#DepartmentID').html('<option disabled selected>Select Department Name</option>');
-                $('#DepartmentID').prop('disabled', false); // Enable the dropdown if no artisan is selected
-            }
-        });
-    });
-
-
-
-    $(document).on("click", '.edit', function() {
-        var $row = $(this).closest('tr');
-        var order_id = $row.data('order_id');
-        var customer_name = $row.data('customer_name');
-        var product = $row.data('product');
-        var quantity = $row.data('quantity');
-        var wages_per_piece = $row.data('wages_per_piece');
-        var production_due_date = $row.data('production_due_date');
-        var department_id = $row.data('department_id');
-        var artisan_id = $row.data('artisan_id');
-
-
-        // Update form fields
-        $('#edit_order_id').val(order_id);
-        $('#eidt_customer_name').val(customer_name);
-        $('#eidt_product').val(product);
-        $('#eidt_quantity').val(quantity);
-        $('#eidt_wages_per_piece').val(wages_per_piece);
-        $('#eidt_production_due_date').val(production_due_date);
-        $('#eidt_department_id').val(department_id);
-        $('#eidt_artisan_id').val(artisan_id);
-
-
-        // Show the popup
-        var myModal = new bootstrap.Modal(document.getElementById('editpaymentModal'));
-        myModal.show();
-        // Show the popup
-
-    });
-
-    $(document).on("click", '.approve', function() {
-        var $row = $(this).closest('tr');
-        var order_id = $row.data('order_id');
-        var product = $row.data('product');
-        var quantity = $row.data('quantity');
-        // Update form fields
-        $('#approve_quantity').val(quantity);
-        $('#approve_reject_quantity').val(0);
-        $('#approve_order_id').val(product);
-        $('#approve_order_id_new').val(order_id);
-
-        var myModal = new bootstrap.Modal(document.getElementById('approvepaymentModal'));
-        myModal.show();
-    });
-
-
-    document.addEventListener("DOMContentLoaded", function() {
-        // Get the "Select All" checkbox and all individual checkboxes in the table
-        const selectAllCheckbox = document.getElementById('checkall');
-        const checkboxes = document.querySelectorAll('input[name="selectedOrders[]"]');
-
-        // Function to check if a checkbox's row belongs to an inprocess or overdue order
-        function isSelectableStatus(status) {
-            return status === 'inprocess' || status === 'Overdue';
-        }
-
-        // When the "Select All" checkbox is clicked
-        selectAllCheckbox.addEventListener('change', function() {
-            // Select only checkboxes for rows with inprocess or overdue status
-            checkboxes.forEach(checkbox => {
-                const status = checkbox.closest('tr').querySelector('td:nth-child(7) span').textContent.trim();
-                if (isSelectableStatus(status)) {
-                    checkbox.checked = selectAllCheckbox.checked;
-                }
-            });
+        // Populate Add Order modal fields based on selected OrderID
+        $('#OrderID').on('change', function() {
+            var selectedOption = $(this).find('option:selected');
+            var customerName = selectedOption.data('customer_name');
+            var product = selectedOption.data('product');
+            var quantity = selectedOption.data('quantity');
+            $('#CustomerName').val(customerName || '');
+            $('#Product').val(product || '');
+            $('#Quantity').val(quantity || '');
+            $('#Quantity').attr('max', quantity || '');
         });
 
-        // If any individual checkbox is unchecked, uncheck the "Select All" checkbox
-        checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                if (!checkbox.checked) {
-                    selectAllCheckbox.checked = false;
-                } else if (Array.from(checkboxes).every(checkbox => {
-                        const status = checkbox.closest('tr').querySelector('td:nth-child(7) span').textContent.trim();
-                        return checkbox.checked && isSelectableStatus(status);
-                    })) {
-                    selectAllCheckbox.checked = true;
-                }
-            });
-        });
-    });
-
-
-
-    $(document).on('click', '#bulkApproveBtn', function() {
-        var selectedOrders = [];
-
-        // Collect selected orders with details
-        $('input[name="selectedOrders[]"]:checked').each(function() {
+        // Populate Edit Order modal
+        $(document).on('click', '.edit', function() {
             var $row = $(this).closest('tr');
-            var orderID = $row.data('order_id');
-            var product = $row.data('product');
-            var artisan = $row.data('artisan_name');
-            var quantity = $row.data('quantity');
+            $('#edit_order_id').val($row.data('order_id'));
+            $('#edit_customer_name').val($row.data('customer_name'));
+            $('#edit_product').val($row.data('product'));
+            $('#edit_quantity').val($row.data('quantity'));
+            $('#edit_quantity').attr('max', $row.data('pending_quantity'));
+            $('#edit_wages_per_piece').val($row.data('wages_per_piece'));
+            $('#edit_production_due_date').val($row.data('production_due_date'));
+            $('#edit_department_id').val($row.data('department_id'));
+            $('#edit_artisan_id').val($row.data('artisan_id'));
+            var myModal = new bootstrap.Modal(document.getElementById('editpaymentModal'));
+            myModal.show();
+        });
 
-            // Add order details to the selectedOrders array
-            selectedOrders.push({
-                order_id: orderID,
-                product: product,
-                artisan: artisan,
-                quantity: quantity
+        // Populate Approve Order modal
+        $(document).on('click', '.approve', function() {
+            var $row = $(this).closest('tr');
+            $('#approve_quantity').val($row.data('quantity'));
+            $('#approve_quantity').attr('max', $row.data('pending_quantity'));
+            $('#approve_order_id').val($row.data('product'));
+            $('#approve_order_id_new').val($row.data('order_id'));
+            var myModal = new bootstrap.Modal(document.getElementById('approvepaymentModal'));
+            myModal.show();
+        });
+
+        // Select All checkbox logic
+        $('#checkall').on('change', function() {
+            $('input[name="selectedOrders[]"]').each(function() {
+                var status = $(this).closest('tr').find('td:nth-child(7) span').text().trim();
+                if (status === 'In Process' || status === 'Overdue') {
+                    $(this).prop('checked', $('#checkall').is(':checked'));
+                }
             });
         });
 
-        // If no orders are selected, show an alert
-        if (selectedOrders.length === 0) {
-            alert("Please select at least one order to approve.");
-            return;
-        }
-
-        // Clear any previous rows in the modal body
-        var modalBody = $('#bulkApproveTable tbody');
-        modalBody.empty();
-
-        // Populate the table with selected orders
-        selectedOrders.forEach(function(order) {
-            var row = '<tr>';
-            row += '<td class="col">' + order.product + '</td>';
-            row += '<td>' + order.artisan + '</td>';
-            row += '<td><input type="number" name="ApprovedQuantity[]" class="form-control" value="' + order.quantity + '" required></td>';
-            row += '<td><input type="date" name="ApprovalDate[]" class="form-control" required></td>';
-            row += '<td><input type="hidden" name="OrderID[]" value="' + order.order_id + '"></td>';
-            row += '</tr>';
-            modalBody.append(row);
+        // Individual checkbox logic
+        $('input[name="selectedOrders[]"]').on('change', function() {
+            if (!$(this).is(':checked')) {
+                $('#checkall').prop('checked', false);
+            } else if ($('input[name="selectedOrders[]"]:checked').length === $('input[name="selectedOrders[]"]').length) {
+                $('#checkall').prop('checked', true);
+            }
         });
 
-        // Show the modal
-        var myModal = new bootstrap.Modal(document.getElementById('bulkapprovepaymentModal'));
-        myModal.show();
-    });
-</script>
-<!-- image privew -->
-<script>
-    const imageInput = document.getElementById('member-image-input');
-    const memberImg = document.getElementById('member-img');
-
-    imageInput.addEventListener('change', function(event) {
-        const file = event.target.files[0];
-
-        if (file) {
-            const reader = new FileReader();
-
-            reader.onload = function(e) {
-                memberImg.src = e.target.result;
+        // Bulk Approve modal
+        $('#bulkApproveBtn').on('click', function() {
+            var selectedOrders = [];
+            $('input[name="selectedOrders[]"]:checked').each(function() {
+                var $row = $(this).closest('tr');
+                selectedOrders.push({
+                    order_id: $row.data('order_id'),
+                    product: $row.data('product'),
+                    artisan: $row.data('artisan_name'),
+                    quantity: $row.data('quantity'),
+                    pending_quantity: $row.data('pending_quantity')
+                });
+            });
+            if (selectedOrders.length === 0) {
+                alert('Please select at least one order to approve.');
+                return;
             }
+            var modalBody = $('#bulkApproveTable tbody');
+            modalBody.empty();
+            selectedOrders.forEach(function(order) {
+                var row = '<tr>' +
+                    '<td>' + order.product + '</td>' +
+                    '<td>' + (order.artisan || 'Not Assigned') + '</td>' +
+                    '<td><input type="number" name="ApprovedQuantity[]" class="form-control" value="' + order.quantity + '" max="' + order.pending_quantity + '" required></td>' +
+                    '<td><input type="date" name="ApprovalDate[]" class="form-control" required></td>' +
+                    '<td><input type="hidden" name="OrderID[]" value="' + order.order_id + '"></td>' +
+                    '</tr>';
+                modalBody.append(row);
+            });
+            var myModal = new bootstrap.Modal(document.getElementById('bulkapprovepaymentModal'));
+            myModal.show();
+        });
 
-            reader.readAsDataURL(file);
-        }
-    });
-</script>
-<!-- image privew -->
-<script>
-    const imageInput_E = document.getElementById('member-image-input_E');
-    const memberImg_E = document.getElementById('edit_profile_pic');
-
-    imageInput_E.addEventListener('change', function(event) {
-        const file = event.target.files[0];
-
-        if (file) {
-            const reader = new FileReader();
-
-            reader.onload = function(e) {
-                memberImg_E.src = e.target.result;
+        // Form validation for quantity
+        $('#add-order-form, #edit-order-form').on('submit', function(e) {
+            var $quantityInput = $(this).find('input[name="Quantity"]');
+            var maxQuantity = parseInt($quantityInput.attr('max')) || Infinity;
+            var quantity = parseInt($quantityInput.val());
+            if (quantity > maxQuantity) {
+                alert('Quantity cannot exceed the pending quantity (' + maxQuantity + ').');
+                e.preventDefault();
+                return false;
             }
-
-            reader.readAsDataURL(file);
-        }
+            $(this).find('button[type="submit"]').prop('disabled', true).html('Submitting...');
+        });
     });
 </script>
-<?php
-include "assets/includes/footer.php";
-?>
+
+<?php include "assets/includes/footer.php"; ?>

@@ -1,3 +1,9 @@
+<?php
+if (!isset($_SESSION['UserID'])) {
+    header('Location: login');
+    exit;
+}
+?>
 <!doctype html>
 <html lang="en" data-layout="vertical" data-topbar="light" data-sidebar="light" data-sidebar-size="lg" data-sidebar-image="none" data-preloader="disable">
 
@@ -151,12 +157,70 @@
                     <div id="two-column-menu"></div>
                     <ul class="navbar-nav" id="navbar-nav">
                         <li class="menu-title"><span data-key="t-menu">Menu</span></li>
+                        <!-- Keep existing Dashboard link -->
                         <li class="nav-item">
                             <a class="nav-link menu-link" href="dashboard">
                                 <i class="fa-solid fa-house-chimney"></i> <span data-key="t-dashboard">Dashboard</span>
                             </a>
                         </li>
+
                         <li class="menu-title"><i class='bx bx-dots-horizontal-rounded'></i> <span data-key="t-pages">Pages</span></li>
+
+                        <!-- Keep existing Sales Orders section -->
+                        <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'SalesPerson') { ?>
+                            <li class="nav-item">
+                                <a class="nav-link menu-link" href="#sidebarSales" data-bs-toggle="collapse" role="button">
+                                    <i class="fa-solid fa-file-invoice"></i> <span data-key="t-sales">Sales Orders</span>
+                                </a>
+                                <div class="collapse menu-dropdown" id="sidebarSales">
+                                    <ul class="nav nav-sm flex-column">
+                                        <li class="nav-item">
+                                            <a href="view_sales_orders" class="nav-link">View Sales Orders</a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </li>
+                        <?php } ?>
+
+                        <!-- Add new Inventory Management section -->
+                        <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'BusinessOperations') { ?>
+                            <li class="nav-item">
+                                <a class="nav-link menu-link" href="#sidebarInventory" data-bs-toggle="collapse" role="button">
+                                    <i class="fa-solid fa-warehouse"></i> <span data-key="t-inventory">Inventory Management</span>
+                                </a>
+                                <div class="collapse menu-dropdown" id="sidebarInventory">
+                                    <ul class="nav nav-sm flex-column">
+                                        <li class="nav-item">
+                                            <a href="inventory_sales_orders" class="nav-link">View Sales Orders</a>
+                                        </li>
+                                        <li class="nav-item">
+                                            <a href="send_to_production" class="nav-link">Send to Production</a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </li>
+                        <?php } ?>
+
+                        <!-- Add new Production Management section -->
+                        <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'Manager' || $_SESSION['Role'] == 'BusinessOperations') { ?>
+                            <li class="nav-item">
+                                <a class="nav-link menu-link" href="#sidebarProduction" data-bs-toggle="collapse" role="button">
+                                    <i class="fa-solid fa-industry"></i> <span data-key="t-production">Production Management</span>
+                                </a>
+                                <div class="collapse menu-dropdown" id="sidebarProduction">
+                                    <ul class="nav nav-sm flex-column">
+                                        <li class="nav-item">
+                                            <a href="production_dashboard" class="nav-link">Production Dashboard</a>
+                                        </li>
+                                        <li class="nav-item">
+                                            <a href="product_assignments" class="nav-link">Product Assignments</a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </li>
+                        <?php } ?>
+
+                        <!-- Keep existing Admin sections -->
                         <?php if ($_SESSION['Role'] == 'Admin') { ?>
                             <li class="nav-item">
                                 <a class="nav-link menu-link" href="users">
@@ -173,60 +237,19 @@
                                     <i class="fa-solid fa-user-tie"></i> <span data-key="t-artisans">Artisans</span>
                                 </a>
                             </li>
-                        <?php } ?>
-                        <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'QualityControl' || $_SESSION['Role'] == 'Manager' || $_SESSION['Role'] == 'Salesperson' || $_SESSION['Role'] == 'BusinessOperations') { ?>
-                            <li class="nav-item">
-                                <a class="nav-link menu-link" href="orders">
-                                    <i class="fa-solid fa-cart-shopping"></i> <span data-key="t-orders">Orders</span>
-                                </a>
-                            </li>
-                        <?php } ?>
-                        <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'Salesperson') { ?>
-                            <li class="nav-item">
-                                <a class="nav-link menu-link" href="sales-orders">
-                                    <i class="fa-solid fa-file-invoice"></i> <span data-key="t-sales-orders">Sales Orders</span>
-                                </a>
-                            </li>
-                        <?php } ?>
-                        <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'BusinessOperations') { ?>
-                            <li class="nav-item">
-                                <a class="nav-link menu-link" href="inventory-check">
-                                    <i class="fa-solid fa-warehouse"></i> <span data-key="t-inventory-check">Inventory Check</span>
-                                </a>
-                            </li>
-                        <?php } ?>
-                        <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'Manager') { ?>
-                            <li class="nav-item">
-                                <a class="nav-link menu-link" href="production-assignment">
-                                    <i class="fa-solid fa-hammer"></i> <span data-key="t-production-assignment">Production Assignment</span>
-                                </a>
-                            </li>
-                        <?php } ?>
-                        <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'QualityControl') { ?>
                             <li class="nav-item">
                                 <a class="nav-link menu-link" href="dispatch">
                                     <i class="fa-solid fa-truck"></i> <span data-key="t-dispatch">Dispatch</span>
                                 </a>
                             </li>
-                        <?php } ?>
-                        <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'Accounts') { ?>
                             <li class="nav-item">
                                 <a class="nav-link menu-link" href="accounts">
-                                    <i class="fa-solid fa-file-invoice"></i> <span data-key="t-accounts">Accounts</span>
+                                    <i class="fa-solid fa-file-invoice-dollar"></i> <span data-key="t-accounts">Accounts</span>
                                 </a>
                             </li>
-                        <?php } ?>
-                        <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'Products') { ?>
                             <li class="nav-item">
                                 <a class="nav-link menu-link" href="products">
                                     <i class="fa-solid fa-box"></i> <span data-key="t-products">Products</span>
-                                </a>
-                            </li>
-                        <?php } ?>
-                        <?php if ($_SESSION['Role'] == 'Admin' || $_SESSION['Role'] == 'Salesperson' || $_SESSION['Role'] == 'BusinessOperations' || $_SESSION['Role'] == 'Manager') { ?>
-                            <li class="nav-item">
-                                <a class="nav-link menu-link" href="production-dashboard">
-                                    <i class="fa-solid fa-chart-line"></i> <span data-key="t-production-dashboard">Production Dashboard</span>
                                 </a>
                             </li>
                         <?php } ?>
