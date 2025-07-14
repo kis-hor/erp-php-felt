@@ -4,35 +4,53 @@ ini_set('display_errors', 1);
 session_start();
 include "config.php";
 
-$fulfillment_data = $_POST['fulfillment'] ?? [];
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $_SESSION['error'] = 'Invalid request method';
+    header('Location: inventory_sales_orders.php');
+    exit;
+}
+
+$fulfillment = $_POST['fulfillment'] ?? [];
+$sales_order_id = 0; // We'll get this from the first product
 
 mysqli_begin_transaction($conn);
+
 try {
-    foreach ($fulfillment_data as $sales_order_product_id => $data) {
-        $sales_order_product_id = (int)$sales_order_product_id;
-        $available_quantity = (int)$data['available_quantity'];
-        $pending_quantity = (int)$data['pending_quantity'];
-
+    foreach ($fulfillment as $sales_order_product_id => $data) {
         // Insert into inventory_fulfillment
-        $insert_sql = "INSERT INTO inventory_fulfillment (SalesOrderProductID, AvailableQuantity, PendingQuantity, CheckedAt) 
-                       VALUES (?, ?, ?, NOW())";
-        $stmt = mysqli_prepare($conn, $insert_sql);
-        mysqli_stmt_bind_param($stmt, 'iii', $sales_order_product_id, $available_quantity, $pending_quantity);
-        if (!mysqli_stmt_execute($stmt)) {
-            throw new Exception('Insert into inventory_fulfillment failed: ' . mysqli_error($conn));
-        }
-        mysqli_stmt_close($stmt);
+        $sql = "INSERT INTO inventory_fulfillment 
+                (SalesOrderProductID, AvailableQuantity, PendingQuantity, Status) 
+                VALUES (?, ?, ?, 'In Progress')";
 
-        // After inserting into inventory_fulfillment
+        $stmt = mysqli_prepare($conn, $sql);
+        mysqli_stmt_bind_param(
+            $stmt,
+            "iii",
+            $sales_order_product_id,
+            $data['available_quantity'],
+            $data['pending_quantity']
+        );
+        mysqli_stmt_execute($stmt);
+
+        // Get the sales_order_id if we haven't yet
+        if (!$sales_order_id) {
+            $sql = "SELECT SalesOrderID FROM sales_order_products WHERE SalesOrderProductID = ?";
+            $stmt = mysqli_prepare($conn, $sql);
+            mysqli_stmt_bind_param($stmt, "i", $sales_order_product_id);
+            mysqli_stmt_execute($stmt);
+            $result = mysqli_stmt_get_result($stmt);
+            $row = mysqli_fetch_assoc($result);
+            $sales_order_id = $row['SalesOrderID'];
+        }
     }
 
     mysqli_commit($conn);
-    $_SESSION['success'] = 'Inventory fulfillment recorded successfully.';
-    header("Location: inventory_fulfillment.php");
-    exit;
+    $_SESSION['success'] = 'Inventory fulfillment recorded successfully';
+    // Redirect to send_to_production.php with the sales_order_id
+    header("Location: send_to_production.php?sales_order_id=" . $sales_order_id);
 } catch (Exception $e) {
     mysqli_rollback($conn);
-    $_SESSION['error'] = 'Failed to record fulfillment: ' . $e->getMessage();
-    header("Location: inventory_fulfillment.php");
-    exit;
+    $_SESSION['error'] = 'Error recording fulfillment: ' . $e->getMessage();
+    header('Location: inventory_fulfillment.php?sales_order_id=' . $sales_order_id);
 }
+exit;

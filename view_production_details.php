@@ -11,11 +11,15 @@ if ($id <= 0) {
     exit;
 }
 
-$sql = "SELECT pa.*, sop.ProductName, sop.ProductDescription, sop.ProductImage,
-               so.PONumber, so.CustomerName, so.SalespersonName
+// Update the SQL query to include inventory_fulfillment fields
+$sql = "SELECT pa.*, 
+               sop.ProductName, sop.ProductDescription, sop.ProductImage,
+               so.PONumber, so.CustomerName, so.SalespersonName,
+               inf.PendingQuantity, inf.Remarks
         FROM production_assignments pa
         JOIN sales_order_products sop ON pa.SalesOrderProductID = sop.SalesOrderProductID
         JOIN sales_orders so ON sop.SalesOrderID = so.SalesOrderID
+        LEFT JOIN inventory_fulfillment inf ON pa.SalesOrderProductID = inf.SalesOrderProductID
         WHERE pa.OrderID = ? AND pa.is_delete = 0";
 
 $stmt = mysqli_prepare($conn, $sql);
@@ -86,8 +90,8 @@ $details = mysqli_fetch_assoc($result);
                                         <div class="col-md-9">
                                             <p><strong>Product Name:</strong> <?php echo htmlspecialchars($details['ProductName']); ?></p>
                                             <p><strong>Description:</strong> <?php echo htmlspecialchars($details['ProductDescription']); ?></p>
-                                            <p><strong>Pending Quantity:</strong> <?php echo $details['PendingQuantity']; ?></p>
-                                            <p><strong>Remarks:</strong> <?php echo htmlspecialchars($details['Remarks']); ?></p>
+                                            <p><strong>Pending Quantity:</strong> <?php echo $details['PendingQuantity'] ?? 0; ?></p>
+                                            <p><strong>Remarks:</strong> <?php echo htmlspecialchars($details['Remarks'] ?? ''); ?></p>
                                         </div>
                                     </div>
                                 </div>
